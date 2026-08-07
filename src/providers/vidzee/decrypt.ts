@@ -28,14 +28,15 @@ export async function decrypt(
             ['decrypt']
         );
 
-        // Step 4: decrypt
+        // Step 4: decrypt (cast buffer args to any to avoid strict overload checks)
+        // @ts-ignore
         const decrypted = await crypto.subtle.decrypt(
             { name: 'AES-CBC', iv },
             cryptoKey,
-            cipherBytes
+            cipherBytes as any
         );
 
-        const res = new TextDecoder().decode(decrypted);
+        const res = new TextDecoder().decode(decrypted as any);
 
         return res;
     } catch (err) {
@@ -88,12 +89,13 @@ export async function deriveKey(e: string): Promise<string> {
 
         let o = await crypto.subtle.importKey(
             'raw',
-            l,
+            l as any,
             { name: 'AES-GCM' },
             false,
             ['decrypt']
         );
 
+        // @ts-ignore
         let c = await crypto.subtle.decrypt(
             {
                 name: 'AES-GCM',
@@ -101,10 +103,10 @@ export async function deriveKey(e: string): Promise<string> {
                 tagLength: 128
             },
             o,
-            i
+            i as any
         );
 
-        return new TextDecoder().decode(c);
+        return new TextDecoder().decode(c as any);
     } catch (err) {
         return '';
     }
