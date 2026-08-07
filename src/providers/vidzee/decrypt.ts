@@ -1,3 +1,9 @@
+function toPlainArrayBuffer(u8: Uint8Array): ArrayBuffer {
+  const ab = new ArrayBuffer(u8.byteLength);
+  new Uint8Array(ab).set(u8);
+  return ab;
+}
+
 export async function decrypt(
     encryptedData: string,
     decryptionKey: string
@@ -16,10 +22,10 @@ export async function decrypt(
 
         const keyBytes = getKeyBytes(decryptionKey);
 
-        // Ensure ArrayBuffer instances (not SharedArrayBuffer or ArrayBufferLike)
-        const ivArrayBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength);
-        const cipherArrayBuffer = cipherBytes.buffer.slice(cipherBytes.byteOffset, cipherBytes.byteOffset + cipherBytes.byteLength);
-        const keyArrayBuffer = keyBytes.buffer.slice(keyBytes.byteOffset, keyBytes.byteOffset + keyBytes.byteLength);
+        // Convert to plain ArrayBuffer copies to avoid SharedArrayBuffer in some environments
+        const ivArrayBuffer = toPlainArrayBuffer(iv);
+        const cipherArrayBuffer = toPlainArrayBuffer(cipherBytes);
+        const keyArrayBuffer = toPlainArrayBuffer(keyBytes);
 
         const cryptoKey = await crypto.subtle.importKey(
             'raw',
@@ -90,14 +96,16 @@ export async function deriveKey(e: string): Promise<string> {
             ['decrypt']
         );
 
-        // Prepare combined buffer as ArrayBuffer
+        // Prepare combined buffer as plain ArrayBuffer
         const combined = i;
-        const combinedArrayBuffer = combined.buffer.slice(combined.byteOffset, combined.byteOffset + combined.byteLength);
+        const combinedArrayBuffer = toPlainArrayBuffer(combined);
+
+        const ivPlain = toPlainArrayBuffer(n);
 
         const decrypted = await crypto.subtle.decrypt(
             {
                 name: 'AES-GCM',
-                iv: new Uint8Array(n.buffer.slice(n.byteOffset, n.byteOffset + n.byteLength)),
+                iv: new Uint8Array(ivPlain),
                 tagLength: 128
             },
             importedKey,
