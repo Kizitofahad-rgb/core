@@ -5,38 +5,37 @@ export async function decrypt(
     try {
         if (!encryptedData || !decryptionKey) return '';
 
-        // Step 1: decode outer base64
         const decoded = atob(encryptedData);
         const [ivBase64, cipherBase64] = decoded.split(':');
-
         if (!ivBase64 || !cipherBase64) return '';
 
-        // Step 2: decode IV and ciphertext
         const iv = Uint8Array.from(atob(ivBase64), (c) => c.charCodeAt(0));
         const cipherBytes = Uint8Array.from(atob(cipherBase64), (c) =>
             c.charCodeAt(0)
         );
 
-        // Step 3: correct key handling (IMPORTANT)
         const keyBytes = getKeyBytes(decryptionKey);
+
+        // Ensure ArrayBuffer instances (not SharedArrayBuffer or ArrayBufferLike)
+        const ivArrayBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength);
+        const cipherArrayBuffer = cipherBytes.buffer.slice(cipherBytes.byteOffset, cipherBytes.byteOffset + cipherBytes.byteLength);
+        const keyArrayBuffer = keyBytes.buffer.slice(keyBytes.byteOffset, keyBytes.byteOffset + keyBytes.byteLength);
 
         const cryptoKey = await crypto.subtle.importKey(
             'raw',
-            keyBytes,
+            keyArrayBuffer,
             { name: 'AES-CBC' },
             false,
             ['decrypt']
         );
 
-        // Step 4: decrypt (cast buffer args to any to avoid strict overload checks)
-        // @ts-ignore
         const decrypted = await crypto.subtle.decrypt(
-            { name: 'AES-CBC', iv },
+            { name: 'AES-CBC', iv: new Uint8Array(ivArrayBuffer) },
             cryptoKey,
-            cipherBytes as any
+            cipherArrayBuffer
         );
 
-        const res = new TextDecoder().decode(decrypted as any);
+        const res = new TextDecoder().decode(decrypted as ArrayBuffer);
 
         return res;
     } catch (err) {
@@ -45,13 +44,9 @@ export async function decrypt(
 }
 
 function getKeyBytes(key: string): Uint8Array {
-    // Treat key as UTF-8 string (LIKE CryptoJS)
     const encoded = new TextEncoder().encode(key);
-
-    // CryptoJS pads/truncates to 32 bytes
     const result = new Uint8Array(32);
     result.set(encoded.slice(0, 32));
-
     return result;
 }
 
@@ -70,7 +65,6 @@ export async function deriveKey(e: string): Promise<string> {
         };
 
         let t = base64ToBytes(e);
-
         if (t.length <= 28) return '';
 
         let n = t.slice(0, 12);
@@ -87,26 +81,30 @@ export async function deriveKey(e: string): Promise<string> {
             encoder.encode('4f2a9c7d1e8b3a6f0d5c2e9a7b1f4d8c')
         );
 
-        let o = await crypto.subtle.importKey(
+        // l is an ArrayBuffer
+        const importedKey = await crypto.subtle.importKey(
             'raw',
-            l as any,
+            l,
             { name: 'AES-GCM' },
             false,
             ['decrypt']
         );
 
-        // @ts-ignore
-        let c = await crypto.subtle.decrypt(
+        // Prepare combined buffer as ArrayBuffer
+        const combined = i;
+        const combinedArrayBuffer = combined.buffer.slice(combined.byteOffset, combined.byteOffset + combined.byteLength);
+
+        const decrypted = await crypto.subtle.decrypt(
             {
                 name: 'AES-GCM',
-                iv: n,
+                iv: new Uint8Array(n.buffer.slice(n.byteOffset, n.byteOffset + n.byteLength)),
                 tagLength: 128
             },
-            o,
-            i as any
+            importedKey,
+            combinedArrayBuffer
         );
 
-        return new TextDecoder().decode(c as any);
+        return new TextDecoder().decode(decrypted as ArrayBuffer);
     } catch (err) {
         return '';
     }
